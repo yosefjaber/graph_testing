@@ -2,8 +2,8 @@
 main.py — Entry point & Test Suite
 ===================================
 Demonstrates and stress-tests both modules:
-  Module 1 — graph.py    : Graph, dijkstra, yen_k_shortest_paths
-  Module 2 — path_planner.py : UnionFind, RailwayPlanner
+  Module 1 — graph.py       : Graph, dijkstra, shortest_path
+  Module 2 — path_planner.py: UnionFind, RailwayPlanner
  
 Run
 ---
@@ -26,7 +26,6 @@ from graph import (
     dijkstra,
     reconstruct_path,
     shortest_path,
-    yen_k_shortest_paths,
 )
 from path_planner import PlanResult, RailwayPlanner, TicketResult, UnionFind
  
@@ -44,7 +43,6 @@ class _TestRunner:
         self._failed = 0
         self._errors: List[str] = []
  
-    # ------------------------------------------------------------------
     def assert_equal(self, actual, expected, label: str = "") -> None:
         if actual == expected:
             self._passed += 1
@@ -86,7 +84,6 @@ class _TestRunner:
             self._errors.append(msg)
             print(msg)
  
-    # ------------------------------------------------------------------
     def report(self) -> bool:
         total = self._passed + self._failed
         status = "PASSED" if self._failed == 0 else "FAILED"
@@ -140,6 +137,15 @@ def test_graph_module() -> bool:
     t.assert_equal(nbrs[1], 8.0, "neighbour weight 0→1")
     t.assert_equal(nbrs[2], 4.0, "neighbour weight 0→2")
  
+    # --- Graph.copy() ---
+    g_copy = g.copy()
+    t.assert_equal(g_copy.num_nodes, g.num_nodes, "copy num_nodes")
+    t.assert_equal(len(g_copy.all_edges()), len(g.all_edges()), "copy edge count")
+    # Modifying copy should not affect original
+    g_copy.remove_edge(0, 1)
+    t.assert_true(g.has_edge(0, 1), "original unaffected after copy mutation")
+    t.assert_false(g_copy.has_edge(0, 1), "copy edge removed")
+ 
     # --- Dijkstra: simple triangle 0→1→2 ---
     tri = Graph.from_edge_list([(0, 1, 1), (1, 2, 2), (0, 2, 10)], num_nodes=3)
     dist, prev = dijkstra(tri, source=0)
@@ -169,33 +175,7 @@ def test_graph_module() -> bool:
     sp_none = shortest_path(tri, 2, 0)
     t.assert_none(sp_none, "shortest_path none")
  
-    # --- Yen's K-Shortest Paths ---
-    # Use a graph with 3 distinct paths from 0→3
-    multi = Graph.from_edge_list(
-        [
-            (0, 1, 1), (1, 3, 1),   # 0→1→3  cost 2
-            (0, 2, 2), (2, 3, 1),   # 0→2→3  cost 3
-            (0, 3, 6),              # 0→3    cost 6
-        ],
-        num_nodes=4,
-    )
-    paths = yen_k_shortest_paths(multi, 0, 3, k=3)
-    t.assert_equal(len(paths), 3, "yen k=3 count")
-    t.assert_almost_equal(paths[0].cost, 2.0, label="yen 1st cost")
-    t.assert_almost_equal(paths[1].cost, 3.0, label="yen 2nd cost")
-    t.assert_almost_equal(paths[2].cost, 6.0, label="yen 3rd cost")
-    t.assert_true(paths[0].cost <= paths[1].cost <= paths[2].cost, "yen ascending")
- 
-    # Yen: fewer paths than k
-    paths_few = yen_k_shortest_paths(tri, 0, 2, k=10)
-    t.assert_true(len(paths_few) >= 1, "yen fewer paths than k: at least 1")
-    t.assert_true(len(paths_few) <= 10, "yen fewer paths than k: ≤ k")
- 
-    # Yen: no path
-    paths_none = yen_k_shortest_paths(tri, 2, 0, k=3)
-    t.assert_equal(paths_none, [], "yen no path → empty list")
- 
-    # PathResult.edges helper
+    # --- PathResult.edges helper ---
     pr = PathResult(cost=5.0, nodes=(0, 1, 2, 3))
     t.assert_equal(pr.edges, [(0, 1), (1, 2), (2, 3)], "PathResult.edges")
  
@@ -261,7 +241,6 @@ def test_path_planner_module() -> bool:
     # Attempt commit that would create cycle — should fail and not modify
     fail = uf4.commit_edges([(0, 2)])
     t.assert_false(fail, "commit_edges cycle → False")
-    # State should be unchanged (0 and 2 were already connected)
     t.assert_true(uf4.connected(0, 2), "state unchanged after failed commit")
  
     # ----------------------------------------------------------------
@@ -290,9 +269,6 @@ def test_path_planner_module() -> bool:
     # ----------------------------------------------------------------
     # RailwayPlanner — cycle avoidance
     # ----------------------------------------------------------------
-    # Linear chain: 0→1→2→3.  Two tickets share all edges.
-    # Ticket (0,3) uses 0→1→2→3.  Ticket (3,0) cannot (would need 3→0 which
-    # isn't in graph), so it should be unsatisfied.
     chain = Graph.from_edge_list(
         [(0, 1, 1), (1, 2, 1), (2, 3, 1)], num_nodes=4
     )
@@ -307,7 +283,6 @@ def test_path_planner_module() -> bool:
     trivial = Graph.from_edge_list([(0, 1, 1)], num_nodes=2)
     triv_planner = RailwayPlanner(trivial, max_k=3)
     triv_result = triv_planner.plan([(0, 0)])
-    # Dijkstra source==dest returns cost 0, single-node path → trivially cycle-free
     t.assert_equal(triv_result.satisfied, 1, "trivial same-node ticket satisfied")
  
     # ----------------------------------------------------------------
@@ -318,7 +293,7 @@ def test_path_planner_module() -> bool:
     t.assert_equal(empty_result.total_cost, 0.0, "empty tickets → cost 0")
  
     # ----------------------------------------------------------------
-    # RailwayPlanner — forced second-shortest path
+    # RailwayPlanner — forced fallback via repeated Dijkstra
     # ----------------------------------------------------------------
     # Graph:
     #   0→1 (1), 1→2 (1)          ← cheapest path for ticket (0,2) costs 2
@@ -327,9 +302,9 @@ def test_path_planner_module() -> bool:
     #
     # Ticket 1: (0, 2)  → committed: 0→1→2  (edges 0-1, 1-2)
     # Ticket 2: (1, 3)
-    #   Shortest: 1→2→3  (cost 2), but edge 1-2 already in network
-    #             → would_create_cycle([1-2, 2-3]): 1 and 2 already connected → CYCLE
-    #   Fallback:  1→3   (cost 4) direct → no cycle ✓
+    #   Attempt 1: 1→2→3 (cost 2) → would create cycle (1 & 2 already connected)
+    #              edges 1→2 and 2→3 removed from working graph
+    #   Attempt 2: 1→3   (cost 4) → no cycle ✓
     fallback_g = Graph.from_edge_list(
         [(0, 1, 1), (1, 2, 1), (0, 2, 5), (2, 3, 1), (1, 3, 4)],
         num_nodes=4,
@@ -347,7 +322,7 @@ def test_path_planner_module() -> bool:
     t.assert_true(fb_result.ticket_results[1].is_satisfied, "fallback ticket 2 sat")
     t.assert_almost_equal(
         fb_result.ticket_results[1].chosen_path.cost, 4.0,  # type: ignore[union-attr]
-        label="fallback ticket 2 cost (2nd-shortest used)",
+        label="fallback ticket 2 cost (repeated Dijkstra used)",
     )
     t.assert_true(
         fb_result.ticket_results[1].attempts >= 2,
@@ -366,7 +341,6 @@ def run_demo() -> None:
     print("  TICKET TO RIDE — WORKED EXAMPLE")
     print("=" * 60)
  
-    # Build the graph from the problem image (8 nodes, 0-7)
     g = _build_sample_graph()
     print(f"\n  Graph: {g}")
  

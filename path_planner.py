@@ -4,7 +4,16 @@ path_planner.py — Module 2: Cycle Detection & Ticket Route Planning
 Responsibilities:
   - Union-Find (Disjoint Set Union) for O(α) cycle detection
   - RailwayPlanner: resolves each ticket to an acyclic, minimum-cost path
-    using Yen's K-Shortest Paths + Union-Find gate-keeping
+    using repeated Dijkstra + Union-Find gate-keeping
+ 
+Algorithm for finding alternate paths
+--------------------------------------
+  Instead of Yen's K-Shortest Paths, we use a simpler repeated Dijkstra
+  approach:
+    1. Run Dijkstra on a working copy of the graph.
+    2. If the resulting path would create a cycle, remove that path's edges
+       from the working copy and run Dijkstra again.
+    3. Repeat up to max_k times until a cycle-free path is found.
  
 Public API
 ----------
@@ -13,10 +22,11 @@ Public API
   UnionFind.union(x, y)      -> bool (False = cycle detected)
   UnionFind.connected(x, y)  -> bool
   UnionFind.would_create_cycle(edges) -> bool
+  UnionFind.commit_edges(edges)       -> bool
  
   RailwayPlanner(graph, max_k)
-  RailwayPlanner.plan(tickets)          -> PlanResult
-  RailwayPlanner.summary(plan_result)   -> str
+  RailwayPlanner.plan(tickets)        -> PlanResult
+  RailwayPlanner.summary(plan_result) -> str
 """
  
 from __future__ import annotations
@@ -24,7 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
  
-from graph import Graph, PathResult, yen_k_shortest_paths
+from graph import Graph, PathResult, shortest_path
  
  
 # ---------------------------------------------------------------------------
@@ -200,12 +210,14 @@ class RailwayPlanner:
     Algorithm
     ---------
     For each ticket (in the order supplied):
-      1. Enumerate up to *max_k* shortest paths via Yen's algorithm.
-      2. Attempt each candidate path in cost order.
+      1. Make a working copy of the graph.
+      2. Run Dijkstra to find the shortest path.
       3. Use UnionFind to check whether adding the path's edges would
          introduce a cycle in the accumulated network.
-      4. Accept the first valid (cycle-free) path; commit its edges.
-      5. If all *max_k* candidates create cycles, mark ticket unsatisfied.
+      4. If no cycle — accept the path and commit its edges.
+      5. If cycle — remove the rejected path's edges from the working
+         copy and run Dijkstra again (repeat up to max_k times).
+      6. If all max_k attempts create cycles, mark ticket unsatisfied.
  
     Parameters
     ----------
@@ -225,9 +237,7 @@ class RailwayPlanner:
     # Primary entry point
     # ------------------------------------------------------------------
  
-    def plan(
-        self, tickets: List[Tuple[int, int]]
-    ) -> PlanResult:
+    def plan(self, tickets: List[Tuple[int, int]]) -> PlanResult:
         """
         Plan routes for all *tickets*.
  
@@ -266,21 +276,32 @@ class RailwayPlanner:
         )
  
     # ------------------------------------------------------------------
-    # Per-ticket resolution
+    # Per-ticket resolution — repeated Dijkstra approach
     # ------------------------------------------------------------------
  
     def _resolve_ticket(
         self, source: int, destination: int, uf: UnionFind
     ) -> TicketResult:
         """
-        Try candidate paths in ascending cost order.
-        Accept the first one that does not create a cycle.
-        """
-        candidates = yen_k_shortest_paths(
-            self._graph, source, destination, self._max_k
-        )
+        Find a cycle-free path from source to destination.
  
-        for attempt, candidate in enumerate(candidates, start=1):
+        Strategy:
+          - Run Dijkstra on a working copy of the graph.
+          - If the shortest path would create a cycle, remove that path's
+            edges from the working copy and try again.
+          - Repeat until a valid path is found or no paths remain.
+        """
+        # Work on a copy so we never modify the original graph
+        working_graph = self._graph.copy()
+ 
+        for attempt in range(1, self._max_k + 1):
+            candidate = shortest_path(working_graph, source, destination)
+ 
+            # No path left in the working graph
+            if candidate is None:
+                break
+ 
+            # Check if this path would create a cycle in the network
             if not uf.would_create_cycle(candidate.edges):
                 return TicketResult(
                     source=source,
@@ -289,11 +310,15 @@ class RailwayPlanner:
                     attempts=attempt,
                 )
  
+            # This path creates a cycle — remove its edges and try again
+            for u, v in candidate.edges:
+                working_graph.remove_edge(u, v)
+ 
         return TicketResult(
             source=source,
             destination=destination,
             chosen_path=None,
-            attempts=len(candidates),
+            attempts=self._max_k,
         )
  
     # ------------------------------------------------------------------

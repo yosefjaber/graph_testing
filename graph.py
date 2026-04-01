@@ -4,15 +4,15 @@ graph.py — Module 1: Graph Representation & Pathfinding
 Responsibilities:
   - Represent a weighted directed graph (Edge, Graph)
   - Dijkstra's single-source shortest-path algorithm
-  - Yen's K-Shortest Paths for enumerating fallback routes
  
 Public API
 ----------
   Graph.add_edge(u, v, weight)
   Graph.from_edge_list(edges, num_nodes)
-  dijkstra(graph, source)            -> (dist, prev)
+  Graph.copy()
+  dijkstra(graph, source)              -> (dist, prev)
   reconstruct_path(prev, source, dest) -> list[int] | None
-  yen_k_shortest_paths(graph, src, dst, k) -> list[PathResult]
+  shortest_path(graph, source, dest)   -> PathResult | None
 """
  
 from __future__ import annotations
@@ -95,6 +95,13 @@ class Graph:
         self._adj[source] = [
             (d, w) for d, w in self._adj[source] if d != destination
         ]
+ 
+    def copy(self) -> "Graph":
+        """Return an independent copy of this graph."""
+        new_graph = Graph(self._num_nodes)
+        for edge in self.all_edges():
+            new_graph.add_edge(edge.source, edge.destination, edge.weight)
+        return new_graph
  
     @classmethod
     def from_edge_list(
@@ -228,117 +235,4 @@ def shortest_path(
     if nodes is None:
         return None
     return PathResult(cost=dist[destination], nodes=tuple(nodes))
- 
- 
-# ---------------------------------------------------------------------------
-# Yen's K-Shortest Paths
-# ---------------------------------------------------------------------------
- 
-def yen_k_shortest_paths(
-    graph: Graph, source: int, destination: int, k: int
-) -> List[PathResult]:
-    """
-    Yen's algorithm: enumerate up to *k* simple shortest paths from
-    source → destination in ascending order of cost.
- 
-    Returns
-    -------
-    List of PathResult, length ≤ k.  Empty if no path exists at all.
-    """
-    if k < 1:
-        raise ValueError("k must be ≥ 1.")
- 
-    first = shortest_path(graph, source, destination)
-    if first is None:
-        return []
- 
-    confirmed: List[PathResult] = [first]
-    # Candidate heap: (cost, path_as_tuple)
-    candidates: List[Tuple[float, Tuple[int, ...]]] = []
-    candidate_set: set = set()  # avoid duplicates
- 
-    for _ in range(k - 1):
-        last_path = confirmed[-1]
- 
-        for i in range(len(last_path.nodes) - 1):
-            spur_node = last_path.nodes[i]
-            root_path = last_path.nodes[: i + 1]
- 
-            # Build a modified graph:
-            # 1. Remove edges used by confirmed paths that share root_path
-            # 2. Remove root_path nodes (except spur_node) to prevent revisits
-            temp_graph = _build_spur_graph(
-                graph, confirmed, root_path, spur_node
-            )
- 
-            spur_result = shortest_path(temp_graph, spur_node, destination)
-            if spur_result is None:
-                continue
- 
-            full_nodes = root_path + spur_result.nodes[1:]
-            full_cost = _path_cost(graph, full_nodes)
- 
-            candidate_key = full_nodes
-            if candidate_key not in candidate_set:
-                candidate_set.add(candidate_key)
-                heapq.heappush(candidates, (full_cost, full_nodes))
- 
-        if not candidates:
-            break
- 
-        best_cost, best_nodes = heapq.heappop(candidates)
-        confirmed.append(PathResult(cost=best_cost, nodes=best_nodes))
- 
-    return confirmed
- 
- 
-# ------------------------------------------------------------------
-# Yen's helpers
-# ------------------------------------------------------------------
- 
-def _build_spur_graph(
-    graph: Graph,
-    confirmed: List[PathResult],
-    root_path: Tuple[int, ...],
-    spur_node: int,
-) -> Graph:
-    """
-    Return a copy of *graph* with:
-      - Edges removed that overlap with already-confirmed paths at root_path.
-      - Root-path nodes (except spur_node) removed to avoid revisiting.
-    """
-    temp = Graph(graph.num_nodes)
- 
-    # Collect edges to block
-    blocked_edges: set = set()
-    for confirmed_path in confirmed:
-        cp = confirmed_path.nodes
-        if len(cp) > len(root_path) and cp[: len(root_path)] == root_path:
-            # Block the next edge after root_path
-            blocked_edges.add((cp[len(root_path) - 1], cp[len(root_path)]))
- 
-    # Nodes to block (all root nodes except spur_node itself)
-    blocked_nodes = set(root_path[:-1])
- 
-    for edge in graph.all_edges():
-        if edge.source in blocked_nodes or edge.destination in blocked_nodes:
-            continue
-        if (edge.source, edge.destination) in blocked_edges:
-            continue
-        temp.add_edge(edge.source, edge.destination, edge.weight)
- 
-    return temp
- 
- 
-def _path_cost(graph: Graph, nodes: Tuple[int, ...]) -> float:
-    """Sum edge weights along a node sequence."""
-    total = 0.0
-    adj_lookup: Dict[int, Dict[int, float]] = {}
-    for edge in graph.all_edges():
-        adj_lookup.setdefault(edge.source, {})[edge.destination] = edge.weight
- 
-    for u, v in zip(nodes, nodes[1:]):
-        w = adj_lookup.get(u, {}).get(v, math.inf)
-        total += w
-    return total
  
