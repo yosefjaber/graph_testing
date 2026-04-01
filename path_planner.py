@@ -17,7 +17,7 @@ class UnionFind:
         self._validate(x)
         if self._parent[x] == x:
             return x
-        return self.find(self._parent[x])  # just walk up, no flattening
+        return self.find(self._parent[x])
 
     def union(self, x: int, y: int) -> bool:
         """
@@ -47,7 +47,7 @@ class UnionFind:
                 creates_cycle = True
                 break
 
-        self._parent = snapshot  # restore
+        self._parent = snapshot
         return creates_cycle
 
     def commit_edges(self, edges: List[Tuple[int, int]]) -> bool:
@@ -74,7 +74,7 @@ class TicketResult:
     """Outcome for a single ticket."""
     source: int
     destination: int
-    chosen_path: Optional[PathResult]   # None → no valid path exists
+    chosen_path: Optional[PathResult]   # None: no valid path exists
     attempts: int                       # how many candidate paths were tried
  
     @property
@@ -114,9 +114,7 @@ class RailwayPlanner:
     """
     Plans a cycle-free railway network that satisfies a set of
     (source, destination) tickets at minimum total cost.
- 
-    Parameters
-    ----------
+
     graph : Graph
         The underlying weighted directed graph.
     max_k : int
