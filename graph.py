@@ -1,31 +1,9 @@
-"""
-graph.py — Module 1: Graph Representation & Pathfinding
-========================================================
-Responsibilities:
-  - Represent a weighted directed graph (Edge, Graph)
-  - Dijkstra's single-source shortest-path algorithm
- 
-Public API
-----------
-  Graph.add_edge(u, v, weight)
-  Graph.from_edge_list(edges, num_nodes)
-  Graph.copy()
-  dijkstra(graph, source)              -> (dist, prev)
-  reconstruct_path(prev, source, dest) -> list[int] | None
-  shortest_path(graph, source, dest)   -> PathResult | None
-"""
- 
 from __future__ import annotations
  
 import heapq
 import math
 from dataclasses import dataclass, field
 from typing import Dict, Iterator, List, Optional, Tuple
- 
- 
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
  
 @dataclass(frozen=True)
 class Edge:
@@ -54,17 +32,10 @@ class PathResult:
         arrow = " → ".join(str(n) for n in self.nodes)
         return f"PathResult(cost={self.cost}, path={arrow})"
  
- 
-# ---------------------------------------------------------------------------
-# Graph
-# ---------------------------------------------------------------------------
- 
 class Graph:
     """
     Weighted directed graph backed by an adjacency list.
- 
-    Parameters
-    ----------
+
     num_nodes : int
         Number of nodes (labelled 0 … num_nodes-1).
     """
@@ -77,10 +48,6 @@ class Graph:
         self._adj: Dict[int, List[Tuple[int, float]]] = {
             i: [] for i in range(num_nodes)
         }
- 
-    # ------------------------------------------------------------------
-    # Construction helpers
-    # ------------------------------------------------------------------
  
     def add_edge(self, source: int, destination: int, weight: float) -> None:
         """Add a directed edge source → destination with the given weight."""
@@ -109,20 +76,14 @@ class Graph:
     ) -> "Graph":
         """
         Construct a Graph from a list of (source, destination, weight) tuples.
- 
-        Example
-        -------
-        >>> g = Graph.from_edge_list([(0, 1, 4), (1, 2, 2)], num_nodes=3)
+
+        g = Graph.from_edge_list([(0, 1, 4), (1, 2, 2)], num_nodes=3)
         """
         g = cls(num_nodes)
         for src, dst, w in edges:
             g.add_edge(src, dst, w)
         return g
- 
-    # ------------------------------------------------------------------
-    # Accessors
-    # ------------------------------------------------------------------
- 
+
     @property
     def num_nodes(self) -> int:
         return self._num_nodes
@@ -142,10 +103,6 @@ class Graph:
             for dst, w in neighbours
         ]
  
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
- 
     def _validate_node(self, node: int) -> None:
         if not (0 <= node < self._num_nodes):
             raise ValueError(
@@ -155,26 +112,9 @@ class Graph:
     def __repr__(self) -> str:
         return f"Graph(nodes={self._num_nodes}, edges={len(self.all_edges())})"
  
- 
-# ---------------------------------------------------------------------------
-# Dijkstra
-# ---------------------------------------------------------------------------
- 
 def dijkstra(
     graph: Graph, source: int
 ) -> Tuple[Dict[int, float], Dict[int, Optional[int]]]:
-    """
-    Run Dijkstra's algorithm from *source* on *graph*.
- 
-    Returns
-    -------
-    dist : dict[node -> float]
-        Shortest distance from source to every reachable node.
-        Unreachable nodes map to math.inf.
-    prev : dict[node -> int | None]
-        Predecessor map for path reconstruction.
-        prev[source] = None; unreachable nodes = None.
-    """
     dist: Dict[int, float] = {n: math.inf for n in range(graph.num_nodes)}
     prev: Dict[int, Optional[int]] = {n: None for n in range(graph.num_nodes)}
  

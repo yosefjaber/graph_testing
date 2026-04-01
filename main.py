@@ -13,13 +13,12 @@ Run
 """
  
 from __future__ import annotations
- 
+
 import math
 import sys
 import traceback
 from typing import List, Tuple
- 
-# ── Module imports ─────────────────────────────────────────────────────────
+
 from graph import (
     Graph,
     PathResult,
@@ -28,7 +27,7 @@ from graph import (
     shortest_path,
 )
 from path_planner import PlanResult, RailwayPlanner, TicketResult, UnionFind
- 
+
  
 # ===========================================================================
 # Helpers
@@ -97,8 +96,7 @@ class _TestRunner:
  
 def _build_sample_graph() -> Graph:
     """
-    Recreate the Stanford graph shown in the problem image.
-    Nodes 0-7, edges from the diagram.
+    Build the sample graph
     """
     edges: List[Tuple[int, int, float]] = [
         (0, 1, 8),
@@ -375,22 +373,22 @@ def main() -> None:
     if not demo_only:
         print("\n━━━  MODULE 1 TESTS (graph.py)  ━━━")
         passed1 = test_graph_module()
- 
+
         print("\n━━━  MODULE 2 TESTS (path_planner.py)  ━━━")
         passed2 = test_path_planner_module()
- 
+
         all_passed = passed1 and passed2
- 
+
         if all_passed:
             print("\n  ✓  All tests passed.\n")
         else:
             print("\n  ✗  Some tests FAILED — see above.\n")
- 
+
     if not test_only:
         run_demo()
- 
+
     sys.exit(0 if all_passed else 1)
- 
+
  
 if __name__ == "__main__":
     main()
