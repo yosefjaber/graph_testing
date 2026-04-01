@@ -154,3 +154,5 @@ def test_graph_module() -> bool:
     t.assert_equal(pr.edges, [(0, 1), (1, 2), (2, 3)], "PathResult.edges")
  
     return t.report()
+
+test_graph_module()
