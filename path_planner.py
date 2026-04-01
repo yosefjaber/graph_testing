@@ -1,45 +1,9 @@
-"""
-path_planner.py — Module 2: Cycle Detection & Ticket Route Planning
-====================================================================
-Responsibilities:
-  - Union-Find (Disjoint Set Union) for O(α) cycle detection
-  - RailwayPlanner: resolves each ticket to an acyclic, minimum-cost path
-    using repeated Dijkstra + Union-Find gate-keeping
- 
-Algorithm for finding alternate paths
---------------------------------------
-  Instead of Yen's K-Shortest Paths, we use a simpler repeated Dijkstra
-  approach:
-    1. Run Dijkstra on a working copy of the graph.
-    2. If the resulting path would create a cycle, remove that path's edges
-       from the working copy and run Dijkstra again.
-    3. Repeat up to max_k times until a cycle-free path is found.
- 
-Public API
-----------
-  UnionFind(n)
-  UnionFind.find(x)          -> root
-  UnionFind.union(x, y)      -> bool (False = cycle detected)
-  UnionFind.connected(x, y)  -> bool
-  UnionFind.would_create_cycle(edges) -> bool
-  UnionFind.commit_edges(edges)       -> bool
- 
-  RailwayPlanner(graph, max_k)
-  RailwayPlanner.plan(tickets)        -> PlanResult
-  RailwayPlanner.summary(plan_result) -> str
-"""
- 
 from __future__ import annotations
  
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
  
 from graph import Graph, PathResult, shortest_path
- 
- 
-# ---------------------------------------------------------------------------
-# Union-Find (Disjoint Set Union) with path-compression & union-by-rank
-# ---------------------------------------------------------------------------
  
 class UnionFind:
     def __init__(self, n: int) -> None:
@@ -64,7 +28,7 @@ class UnionFind:
         root_y = self.find(y)
 
         if root_x == root_y:
-            return False  # already in the same component — cycle!
+            return False  # already in the same component meaning cycle
 
         self._parent[root_x] = root_y  # attach x's root under y's root
         return True
@@ -105,17 +69,13 @@ class UnionFind:
             components.setdefault(r, []).append(i)
         return f"UnionFind(components={list(components.values())})"
  
-# ---------------------------------------------------------------------------
-# Result types
-# ---------------------------------------------------------------------------
- 
 @dataclass
 class TicketResult:
     """Outcome for a single ticket."""
     source: int
     destination: int
     chosen_path: Optional[PathResult]   # None → no valid path exists
-    attempts: int                        # how many candidate paths were tried
+    attempts: int                       # how many candidate paths were tried
  
     @property
     def is_satisfied(self) -> bool:
@@ -149,28 +109,11 @@ class PlanResult:
             f"unsatisfied={self.unsatisfied}, "
             f"total_cost={self.total_cost})"
         )
- 
- 
-# ---------------------------------------------------------------------------
-# Railway Planner
-# ---------------------------------------------------------------------------
- 
+
 class RailwayPlanner:
     """
     Plans a cycle-free railway network that satisfies a set of
     (source, destination) tickets at minimum total cost.
- 
-    Algorithm
-    ---------
-    For each ticket (in the order supplied):
-      1. Make a working copy of the graph.
-      2. Run Dijkstra to find the shortest path.
-      3. Use UnionFind to check whether adding the path's edges would
-         introduce a cycle in the accumulated network.
-      4. If no cycle — accept the path and commit its edges.
-      5. If cycle — remove the rejected path's edges from the working
-         copy and run Dijkstra again (repeat up to max_k times).
-      6. If all max_k attempts create cycles, mark ticket unsatisfied.
  
     Parameters
     ----------
@@ -186,21 +129,9 @@ class RailwayPlanner:
         self._graph = graph
         self._max_k = max_k
  
-    # ------------------------------------------------------------------
-    # Primary entry point
-    # ------------------------------------------------------------------
- 
     def plan(self, tickets: List[Tuple[int, int]]) -> PlanResult:
         """
         Plan routes for all *tickets*.
- 
-        Parameters
-        ----------
-        tickets : list of (source, destination) int pairs
- 
-        Returns
-        -------
-        PlanResult containing per-ticket outcomes and aggregate statistics.
         """
         uf = UnionFind(self._graph.num_nodes)
         ticket_results: List[TicketResult] = []
@@ -228,21 +159,11 @@ class RailwayPlanner:
             committed_edges=all_committed_edges,
         )
  
-    # ------------------------------------------------------------------
-    # Per-ticket resolution — repeated Dijkstra approach
-    # ------------------------------------------------------------------
- 
     def _resolve_ticket(
         self, source: int, destination: int, uf: UnionFind
     ) -> TicketResult:
         """
         Find a cycle-free path from source to destination.
- 
-        Strategy:
-          - Run Dijkstra on a working copy of the graph.
-          - If the shortest path would create a cycle, remove that path's
-            edges from the working copy and try again.
-          - Repeat until a valid path is found or no paths remain.
         """
         # Work on a copy so we never modify the original graph
         working_graph = self._graph.copy()
@@ -273,10 +194,6 @@ class RailwayPlanner:
             chosen_path=None,
             attempts=self._max_k,
         )
- 
-    # ------------------------------------------------------------------
-    # Reporting
-    # ------------------------------------------------------------------
  
     @staticmethod
     def summary(result: PlanResult) -> str:
