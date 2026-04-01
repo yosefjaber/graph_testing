@@ -42,115 +42,68 @@ from graph import Graph, PathResult, shortest_path
 # ---------------------------------------------------------------------------
  
 class UnionFind:
-    """
-    Disjoint Set Union structure for *n* elements (labelled 0 … n-1).
- 
-    Used to detect cycles when edges are incrementally added to a graph:
-    an edge (u, v) introduces a cycle iff u and v are already in the same
-    connected component.
-    """
- 
     def __init__(self, n: int) -> None:
         if n < 1:
             raise ValueError("UnionFind must have at least one element.")
         self._parent: List[int] = list(range(n))
-        self._rank: List[int] = [0] * n
         self._n = n
- 
-    # ------------------------------------------------------------------
-    # Core operations
-    # ------------------------------------------------------------------
- 
+
     def find(self, x: int) -> int:
-        """
-        Return the representative (root) of the set containing *x*.
-        Uses path-compression for amortised O(α) performance.
-        """
+        """Trace up the parent chain until we hit a root (a node that is its own parent)."""
         self._validate(x)
-        if self._parent[x] != x:
-            self._parent[x] = self.find(self._parent[x])  # path compression
-        return self._parent[x]
- 
+        if self._parent[x] == x:
+            return x
+        return self.find(self._parent[x])  # just walk up, no flattening
+
     def union(self, x: int, y: int) -> bool:
         """
-        Merge the sets containing *x* and *y*.
- 
-        Returns
-        -------
-        True  — sets were disjoint; merge performed successfully.
-        False — x and y were already in the same set (adding this edge
-                would create a cycle).
+        Merge the two components.
+        Returns False if x and y are already connected (cycle detected).
         """
-        root_x, root_y = self.find(x), self.find(y)
+        root_x = self.find(x)
+        root_y = self.find(y)
+
         if root_x == root_y:
-            return False  # cycle detected
- 
-        # Union by rank keeps the tree shallow
-        if self._rank[root_x] < self._rank[root_y]:
-            root_x, root_y = root_y, root_x
-        self._parent[root_y] = root_x
-        if self._rank[root_x] == self._rank[root_y]:
-            self._rank[root_x] += 1
+            return False  # already in the same component — cycle!
+
+        self._parent[root_x] = root_y  # attach x's root under y's root
         return True
- 
+
     def connected(self, x: int, y: int) -> bool:
-        """Return True if *x* and *y* belong to the same component."""
+        """Return True if x and y are in the same component."""
         return self.find(x) == self.find(y)
- 
-    # ------------------------------------------------------------------
-    # Convenience: non-destructive cycle check
-    # ------------------------------------------------------------------
- 
+
     def would_create_cycle(self, edges: List[Tuple[int, int]]) -> bool:
-        """
-        Check whether adding *all* given (u, v) edges to the current
-        structure would introduce a cycle — without permanently modifying
-        the structure.
- 
-        Internally snapshots state, tests, then restores.
-        """
-        snapshot_parent = self._parent[:]
-        snapshot_rank = self._rank[:]
- 
+        """Test edges without permanently modifying state."""
+        snapshot = self._parent[:]
+
         creates_cycle = False
         for u, v in edges:
             if not self.union(u, v):
                 creates_cycle = True
                 break
- 
-        # Restore
-        self._parent = snapshot_parent
-        self._rank = snapshot_rank
+
+        self._parent = snapshot  # restore
         return creates_cycle
- 
+
     def commit_edges(self, edges: List[Tuple[int, int]]) -> bool:
-        """
-        Permanently add *edges* to the structure.
- 
-        Returns True on success, False if any edge would create a cycle
-        (in which case NO edges are committed — all-or-nothing semantics).
-        """
+        """Permanently add edges — all or nothing."""
         if self.would_create_cycle(edges):
             return False
         for u, v in edges:
             self.union(u, v)
         return True
- 
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
- 
+
     def _validate(self, x: int) -> None:
         if not (0 <= x < self._n):
             raise ValueError(f"Element {x} out of range [0, {self._n - 1}].")
- 
+
     def __repr__(self) -> str:
         components: Dict[int, List[int]] = {}
         for i in range(self._n):
             r = self.find(i)
             components.setdefault(r, []).append(i)
         return f"UnionFind(components={list(components.values())})"
- 
  
 # ---------------------------------------------------------------------------
 # Result types
