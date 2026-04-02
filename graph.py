@@ -35,9 +35,6 @@ class PathResult:
 class Graph:
     """
     Weighted directed graph backed by an adjacency list.
-
-    num_nodes : int
-        Number of nodes (labelled 0 … num_nodes-1).
     """
  
     def __init__(self, num_nodes: int) -> None:
