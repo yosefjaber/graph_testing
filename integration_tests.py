@@ -7,7 +7,7 @@ def test_1():
         (0, 1, 1), (1, 2, 1),  # path for ticket 1
         (3, 4, 1), (4, 5, 1),  # path for ticket 2
     ], num_nodes=6)
-    planner = RailwayPlanner(g, max_k=5)
+    planner = RailwayPlanner(g)
     result = planner.plan([(0, 2), (3, 5)])
     assert result.satisfied == 2
     assert result.unsatisfied == 0
@@ -18,7 +18,7 @@ def test_2():
         (0, 1, 1), (1, 2, 1), (2, 3, 1)
     ], num_nodes=4)
 
-    planner = RailwayPlanner(g, max_k=5)
+    planner = RailwayPlanner(g)
     result = planner.plan([(0, 3), (3, 0)])
 
     assert result.satisfied == 1
