@@ -13,7 +13,7 @@ class UnionFind:
         self._n = n
 
     def find(self, x: int) -> int:
-        """Trace up the parent chain until we hit a root (a node that is its own parent)."""
+        """Recursively trace up the parent chain until we hit a root (a node that is its own parent)."""
         self._validate(x)
         if self._parent[x] == x:
             return x
@@ -51,7 +51,7 @@ class UnionFind:
         return creates_cycle
 
     def commit_edges(self, edges: List[Tuple[int, int]]) -> bool:
-        """Permanently add edges — all or nothing."""
+        """Permanently add edges all or nothing."""
         if self.would_create_cycle(edges):
             return False
         for u, v in edges:
