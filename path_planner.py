@@ -109,7 +109,7 @@ class PlanResult:
             f"unsatisfied={self.unsatisfied}, "
             f"total_cost={self.total_cost})"
         )
-
+    
 class RailwayPlanner:
     """
     Plans a cycle-free railway network that satisfies a set of

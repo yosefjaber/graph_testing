@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import math
-import sys
-import traceback
 from typing import List, Tuple
 
 from graph import (
@@ -12,7 +10,6 @@ from graph import (
     reconstruct_path,
     shortest_path,
 )
-from path_planner import PlanResult, RailwayPlanner, TicketResult, UnionFind
 
 class _TestRunner:
     """Lightweight test harness (no external dependencies)."""

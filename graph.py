@@ -156,7 +156,7 @@ def reconstruct_path(
  
     path.reverse()
  
-    if not path or path[0] == source:
+    if not path or path[0] != source:
         return None  # destination is unreachable from source
     return path
  
